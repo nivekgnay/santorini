@@ -1,0 +1,67 @@
+#alerts {
+    height: 40px;
+    line-height: 40px;
+}
+
+#pass-btn {
+}
+
+#board {
+    position: relative;
+    border-bottom: 2px #000 solid;
+    border-right: 2px #000 solid;
+}
+
+.intersection {
+    width: 40px;
+    height: 40px;
+    border-left: 2px #000 solid;
+    border-top: 2px #000 solid;
+    /*border-radius: 20px;*/
+    /*padding: 2px;*/
+    position: absolute;
+    box-sizing: border-box;
+}
+
+/*.intersection:before {
+    border-top: 2px #000 solid;
+    width: 40px;
+    display: block;
+    content: "";
+    top: 0px;
+    position: absolute;
+    /*z-index: -1;
+}*/
+
+/*.intersection:after {
+    border-left: 2px #000 solid;
+    height: 40px;
+    display: block;
+    content: "";
+    left: 0px;
+    top: 0px;
+    position: absolute;
+    /*z-index: -1;
+}*/
+
+/*.intersection.black_piece {
+   background-image: linear-gradient(red, yellow);
+   background-color: #444;
+}*/
+
+.intersection.black, .intersection.white {
+    border: 0px solid #000;
+}
+
+.intersection.black {
+    /*background-image: linear-gradient(red, yellow);*/
+    background-image: url('man_piece_black.png');
+    background-size: cover;
+    background-color: blue
+}
+
+.intersection.white {
+    background-image: url('man_piece_white.png');
+    background-size: cover;
+    background-color: #eee;
+}
