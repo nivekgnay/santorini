@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <vector>
+#include <unordered_map>
 
 using namespace std;
 
@@ -163,7 +165,7 @@ void test_moves() {
 	s.turn = 0;
 	s.p1 = {0, 0, 2, 2};
 	s.p2 = {0, 2, 1, 1};
-	s.board = "230000000";
+	s.board = "000000000";
 	vector<GameState> v = get_moves(s);
 	cout << v.size() << endl;
 	for (int i = 0; i < v.size(); ++i) {
@@ -172,8 +174,116 @@ void test_moves() {
 	}
 }
 
+int is_game_over(GameState s) {
+	// Returns 1 if p1 wins, -1 if p2 wins, 0 otherwise
+	int index1 = s.p1.row1 * s.dim + s.p1.col1;
+	int index2 = s.p1.row2 * s.dim + s.p1.col2;
+	int index3 = s.p2.row1 * s.dim + s.p2.col1;
+	int index4 = s.p2.row2 * s.dim + s.p2.col2;
+
+	if (s.board[index1] == '3' || s.board[index2] == '3') {
+		return 1;
+	} else if (s.board[index3] == '3' || s.board[index4] == '3') {
+		return -1;
+	} else {
+		return 0;
+	}
+}
+
+string state_to_string(GameState s) {
+	istringstream iss(s.board);
+	ostringstream oss;
+
+	for (int row = 0; row < s.dim; ++row) {
+		for (int col = 0; col < s.dim; ++col) {
+			char c;
+			iss >> c;
+			oss << c;
+			if ((row == s.p1.row1 && col == s.p1.col1) ||
+				(row == s.p1.row2 && col == s.p1.col2)) {
+				oss << "*";
+			} else if ((row == s.p2.row1 && col == s.p2.col1) ||
+					   (row == s.p2.row2 && col == s.p2.col2)) {
+				oss << "^";
+			}
+		}
+	}
+	return oss.str();
+}
+
+int minimax(GameState s, unordered_map<string,int>& u1, unordered_map<string,int>& u2, int depth) {
+	int check = is_game_over(s);
+	if (check != 0) {
+		// cout << "Leaf node found with value " << check << ", depth: " << depth << endl;
+		return check;
+	}
+
+	string state_str = state_to_string(s);
+	if (s.turn == 0) {
+		// maximizing player
+		if (u1.find(state_str) != u1.end()) {
+			cout << "Cache Hit" << endl;
+			return u1[state_str];
+		}
+
+		// if no_moves left, lose by default
+		int best_val = -1;
+		vector<GameState> v = get_moves(s);
+		for (GameState next : v) {
+			best_val = max(best_val, minimax(next, u1, u2, depth + 1));
+			if (best_val == 1) {
+				break;
+			}
+		}
+		u1[state_str] = best_val;
+		return best_val;
+	} else {
+		if (u2.find(state_str) != u2.end()) {
+			cout << "Cache Hit" << endl;
+			return u2[state_str];
+		}
+
+		int best_val = 1;
+		vector<GameState> v = get_moves(s);
+		for (GameState next : v) {
+			best_val = min(best_val, minimax(next, u1, u2, depth + 1));
+			if (best_val == -1) {
+				break;
+			}
+		}
+		u2[state_str] = best_val;
+		return best_val;
+	}
+}
+
+void test_minimax() {
+	GameState s;
+	s.dim = 3;
+	s.turn = 0;
+	s.p1 = {0, 0, 2, 2};
+	s.p2 = {0, 2, 1, 1};
+	s.board = "000000000";
+
+	unordered_map<string, int> p1_cache;
+	unordered_map<string, int> p2_cache;
+
+	int sol = minimax(s, p1_cache, p2_cache, 0);
+	cout << sol << endl;
+}
+
+void test_state_to_string() {
+	GameState s;
+	s.dim = 3;
+	s.turn = 0;
+	s.p1 = {0, 0, 2, 2};
+	s.p2 = {0, 2, 1, 1};
+	s.board = "000000000";
+
+	cout << state_to_string(s) << endl;
+}
+
 int main() {
-	test_moves();
+	test_minimax();
 	return 0;
 }
 
