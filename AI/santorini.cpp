@@ -3,6 +3,7 @@
 #include <sstream>
 #include <vector>
 #include <unordered_map>
+#include <boost/optional.hpp>
 
 using namespace std;
 
@@ -174,8 +175,8 @@ void test_moves() {
 	}
 }
 
-int is_game_over(GameState s) {
-	// Returns 1 if p1 wins, -1 if p2 wins, 0 otherwise
+boost::optional<int> is_game_over(GameState s) {
+	// Returns 1 if p1 wins, -1 if p2 wins, false otherwise
 	int index1 = s.p1.row1 * s.dim + s.p1.col1;
 	int index2 = s.p1.row2 * s.dim + s.p1.col2;
 	int index3 = s.p2.row1 * s.dim + s.p2.col1;
@@ -186,8 +187,88 @@ int is_game_over(GameState s) {
 	} else if (s.board[index3] == '3' || s.board[index4] == '3') {
 		return -1;
 	} else {
-		return 0;
+		return boost::optional<int>();
 	}
+}
+
+GameState reflect_horizontal(GameState s) {
+	GameState reflect = s;
+
+	ostringstream oss;
+	for (int row = s.dim - 1; row >= 0; --row) {
+		for (int col = 0; col < s.dim; ++col) {
+			oss << s.board[row * s.dim + col];
+		}
+	}
+	reflect.board = oss.str();
+	Position reflect_p1 = {s.dim - s.p1.row1 - 1, s.p1.col1, 
+						   s.dim - s.p1.row2 - 1, s.p1.col2};
+	Position reflect_p2 = {s.dim - s.p2.row1 - 1, s.p2.col1, 
+						   s.dim - s.p2.row2 - 1, s.p2.col2};
+	reflect.p1 = reflect_p1;
+	reflect.p2 = reflect_p2;
+
+	return reflect;
+}
+
+GameState reflect_vertical(GameState s) {
+	GameState reflect = s;
+
+	ostringstream oss;
+	for (int row = 0; row < s.dim; ++row) {
+		for (int col = s.dim - 1; col >= 0; --col) {
+			oss << s.board[row * s.dim + col];
+		}
+	}
+	reflect.board = oss.str();
+	Position reflect_p1 = {s.p1.row1, s.dim - s.p1.col1 - 1, 
+						   s.p1.row2, s.dim - s.p1.col2 - 1};
+	Position reflect_p2 = {s.p2.row1, s.dim - s.p2.col1 - 1, 
+						   s.p2.row2, s.dim - s.p2.col2 - 1};
+	reflect.p1 = reflect_p1;
+	reflect.p2 = reflect_p2;
+
+	return reflect;
+}
+
+GameState reflect_left_diag(GameState s) {
+	GameState reflect = s;
+
+	ostringstream oss;
+	for (int col = 0; col < s.dim; ++col) {
+		for (int row = 0; row < s.dim; ++row) {
+			oss << s.board[row * s.dim + col];
+		}
+	}
+	reflect.board = oss.str();
+	Position reflect_p1 = {s.p1.col1, s.p1.row1, 
+						   s.p1.col2, s.p1.row2};
+	Position reflect_p2 = {s.p2.col1, s.p2.row1, 
+						   s.p2.col2, s.p2.row2};
+	reflect.p1 = reflect_p1;
+	reflect.p2 = reflect_p2;
+
+	return reflect;
+}
+
+GameState reflect_right_diag(GameState s) {
+	GameState reflect = s;
+
+	ostringstream oss;
+	for (int col = s.dim - 1; col >= 0; --col) {
+		for (int row = s.dim - 1; row >= 0; --row) {
+			oss << s.board[row * s.dim + col];
+		}
+	}
+	reflect.board = oss.str();
+	Position reflect_p1 = {s.dim - s.p1.col1 - 1, s.dim - s.p1.row1 - 1, 
+						   s.dim - s.p1.col2 - 1, s.dim - s.p1.row2 - 1};
+	Position reflect_p2 = {s.dim - s.p2.col1 - 1, s.dim - s.p2.row1 - 1, 
+						   s.dim - s.p2.col2 - 1, s.dim - s.p2.row2 - 1};
+	reflect.p1 = reflect_p1;
+	reflect.p2 = reflect_p2;
+
+	return reflect;
 }
 
 string state_to_string(GameState s) {
@@ -201,57 +282,127 @@ string state_to_string(GameState s) {
 			oss << c;
 			if ((row == s.p1.row1 && col == s.p1.col1) ||
 				(row == s.p1.row2 && col == s.p1.col2)) {
-				oss << "*";
+				if (s.turn == 0) {
+					oss << "*";
+				} else {
+					oss << "^";
+				}
 			} else if ((row == s.p2.row1 && col == s.p2.col1) ||
 					   (row == s.p2.row2 && col == s.p2.col2)) {
-				oss << "^";
+				if (s.turn == 0) {
+					oss << "^";
+				} else {
+					oss << "*";
+				}
 			}
 		}
 	}
 	return oss.str();
 }
 
-int minimax(GameState s, unordered_map<string,int>& u1, unordered_map<string,int>& u2, int depth) {
-	int check = is_game_over(s);
-	if (check != 0) {
-		// cout << "Leaf node found with value " << check << ", depth: " << depth << endl;
-		return check;
+boost::optional<int> get_cached_value(GameState s, unordered_map<string,int>& cache) {
+	string state_str = state_to_string(s);
+	if (cache.find(state_str) != cache.end()) {
+		return cache[state_str];
 	}
+
+	GameState s_horizontal = reflect_horizontal(s);
+	state_str = state_to_string(s_horizontal);
+	if (cache.find(state_str) != cache.end()) {
+		return cache[state_str];
+	}
+
+	GameState s_vertical = reflect_vertical(s);
+	state_str = state_to_string(s_vertical);
+	if (cache.find(state_str) != cache.end()) {
+		return cache[state_str];
+	}
+
+	GameState s_left_diag = reflect_left_diag(s);
+	state_str = state_to_string(s_left_diag);
+	if (cache.find(state_str) != cache.end()) {
+		return cache[state_str];
+	}
+
+	GameState s_right_diag = reflect_right_diag(s);
+	state_str = state_to_string(s_right_diag);
+	if (cache.find(state_str) != cache.end()) {
+		return cache[state_str];
+	}
+
+	GameState s_rotate1 = reflect_left_diag(s_horizontal);
+	state_str = state_to_string(s_rotate1);
+	if (cache.find(state_str) != cache.end()) {
+		return cache[state_str];
+	}
+
+	GameState s_rotate2 = reflect_vertical(s_horizontal);
+	state_str = state_to_string(s_rotate2);
+	if (cache.find(state_str) != cache.end()) {
+		return cache[state_str];
+	}
+
+	GameState s_rotate3 = reflect_right_diag(s_horizontal);
+	state_str = state_to_string(s_rotate3);
+	if (cache.find(state_str) != cache.end()) {
+		return cache[state_str];
+	}
+
+	return boost::optional<int>();
+}
+
+int minimax(GameState s, unordered_map<string,int>& cache, int depth) {
+	if (boost::optional<int> check = is_game_over(s)) {
+		return *check;
+	}
+	// if (check != 0) {
+	// 	// cout << "Leaf node found with value " << check << ", depth: " << depth << endl;
+	// 	return check;
+	// }
 
 	string state_str = state_to_string(s);
 	if (s.turn == 0) {
 		// maximizing player
-		if (u1.find(state_str) != u1.end()) {
-			cout << "Cache Hit" << endl;
-			return u1[state_str];
+		if (boost::optional<int> cached_value = get_cached_value(s, cache)) {
+			cout << "Cache Hit!" << endl;
+			return *cached_value;
 		}
+		// if (u1.find(state_str) != u1.end()) {
+		// 	cout << "Cache Hit" << endl;
+		// 	return u1[state_str];
+		// }
 
 		// if no_moves left, lose by default
 		int best_val = -1;
 		vector<GameState> v = get_moves(s);
 		for (GameState next : v) {
-			best_val = max(best_val, minimax(next, u1, u2, depth + 1));
+			best_val = max(best_val, minimax(next, cache, depth + 1));
 			if (best_val == 1) {
 				break;
 			}
 		}
-		u1[state_str] = best_val;
+		cache[state_str] = best_val;
 		return best_val;
 	} else {
-		if (u2.find(state_str) != u2.end()) {
-			cout << "Cache Hit" << endl;
-			return u2[state_str];
+		if (boost::optional<int> cached_value = get_cached_value(s, cache)) {
+			cout << "Cache Hit!" << endl;
+			return -1 * (*cached_value);
 		}
+
+		// if (u2.find(state_str) != u2.end()) {
+		// 	cout << "Cache Hit" << endl;
+		// 	return u2[state_str];
+		// }
 
 		int best_val = 1;
 		vector<GameState> v = get_moves(s);
 		for (GameState next : v) {
-			best_val = min(best_val, minimax(next, u1, u2, depth + 1));
+			best_val = min(best_val, minimax(next, cache, depth + 1));
 			if (best_val == -1) {
 				break;
 			}
 		}
-		u2[state_str] = best_val;
+		cache[state_str] = -1*best_val;
 		return best_val;
 	}
 }
@@ -264,10 +415,9 @@ void test_minimax() {
 	s.p2 = {0, 2, 1, 1};
 	s.board = "000000000";
 
-	unordered_map<string, int> p1_cache;
-	unordered_map<string, int> p2_cache;
+	unordered_map<string, int> cache;
 
-	int sol = minimax(s, p1_cache, p2_cache, 0);
+	int sol = minimax(s, cache, 0);
 	cout << sol << endl;
 }
 
@@ -280,6 +430,47 @@ void test_state_to_string() {
 	s.board = "000000000";
 
 	cout << state_to_string(s) << endl;
+}
+
+void test_rotate() {
+	GameState s;
+	s.dim = 3;
+	s.turn = 0;
+	s.p1 = {0, 0, 2, 2};
+	s.p2 = {0, 2, 1, 1};
+	s.board = "012345678";
+
+	cout << "Initial State" << endl;
+	print_state(s);
+	cout << endl;
+
+	cout << "Reflect Horizontal" << endl;
+	print_state(reflect_horizontal(s));
+	cout << endl;
+
+	cout << "Reflect Vertical" << endl;
+	print_state(reflect_vertical(s));
+	cout << endl;
+
+	cout << "Reflect Left Diagonal" << endl;
+	print_state(reflect_left_diag(s));
+	cout << endl;
+
+	cout << "Reflect Right Diagonal" << endl;
+	print_state(reflect_right_diag(s));
+	cout << endl;
+
+	cout << "Rotate 90 Degrees Clockwise" << endl;
+	print_state(reflect_left_diag(reflect_horizontal(s)));
+	cout << endl;
+
+	cout << "Rotate 180 Degrees Clockwise" << endl;
+	print_state(reflect_vertical(reflect_horizontal(s)));
+	cout << endl;
+
+	cout << "Rotate 270 Degrees Clockwise" << endl;
+	print_state(reflect_right_diag(reflect_horizontal(s)));
+	cout << endl;
 }
 
 int main() {
