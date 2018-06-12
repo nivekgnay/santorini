@@ -1,9 +1,14 @@
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <sstream>
 #include <vector>
 #include <unordered_map>
+#include <functional>
 #include <boost/optional.hpp>
+#include <boost/serialization/unordered_map.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
 
 using namespace std;
 
@@ -133,6 +138,45 @@ vector<GameState> get_moves(GameState s) {
 				}
 			}
 		}
+	}
+	return all_moves;
+}
+
+int height_heuristic(GameState s) {
+	// p1's height - p2's height
+	// Position p;
+	// if (s.turn == 0) {
+	// 	p = s.p1;
+	// } else {
+	// 	p = s.p2;
+	// }
+
+	int index1 = s.p1.row1 * s.dim + s.p1.col1;
+	int index2 = s.p1.row2 * s.dim + s.p1.col2;
+
+	int index3 = s.p2.row1 * s.dim + s.p2.col1;
+	int index4 = s.p2.row2 * s.dim + s.p2.col2;
+
+	return s.board[index1] + s.board[index2] - s.board[index3] - s.board[index4];
+
+	// int height1 = s.board[index1] - '0';
+	// int height2 = s.board[index2] - '0';
+
+	// return height1 + height2;
+}
+
+vector<GameState> get_ordered_moves(GameState s, function<int(GameState)> h) {
+	vector<GameState> all_moves = get_moves(s);
+	if (s.turn == 0) {
+		sort(all_moves.begin(), all_moves.end(), 
+			[&h](const GameState& a, const GameState& b) -> bool {
+				return h(a) > h(b);
+			});
+	} else {
+		sort(all_moves.begin(), all_moves.end(), 
+			[&h](const GameState& a, const GameState& b) -> bool {
+				return h(a) < h(b);
+			});
 	}
 	return all_moves;
 }
@@ -351,14 +395,10 @@ boost::optional<int> get_cached_value(GameState s, unordered_map<string,int>& ca
 	return boost::optional<int>();
 }
 
-int minimax(GameState s, unordered_map<string,int>& cache, int depth) {
+int minimax(GameState s, unordered_map<string,int>& cache) {
 	if (boost::optional<int> check = is_game_over(s)) {
 		return *check;
 	}
-	// if (check != 0) {
-	// 	// cout << "Leaf node found with value " << check << ", depth: " << depth << endl;
-	// 	return check;
-	// }
 
 	string state_str = state_to_string(s);
 	if (s.turn == 0) {
@@ -367,16 +407,13 @@ int minimax(GameState s, unordered_map<string,int>& cache, int depth) {
 			cout << "Cache Hit!" << endl;
 			return *cached_value;
 		}
-		// if (u1.find(state_str) != u1.end()) {
-		// 	cout << "Cache Hit" << endl;
-		// 	return u1[state_str];
-		// }
 
 		// if no_moves left, lose by default
 		int best_val = -1;
-		vector<GameState> v = get_moves(s);
+		// vector<GameState> v = get_moves(s)
+		vector<GameState> v = get_ordered_moves(s, &height_heuristic);
 		for (GameState next : v) {
-			best_val = max(best_val, minimax(next, cache, depth + 1));
+			best_val = max(best_val, minimax(next, cache));
 			if (best_val == 1) {
 				break;
 			}
@@ -389,15 +426,11 @@ int minimax(GameState s, unordered_map<string,int>& cache, int depth) {
 			return -1 * (*cached_value);
 		}
 
-		// if (u2.find(state_str) != u2.end()) {
-		// 	cout << "Cache Hit" << endl;
-		// 	return u2[state_str];
-		// }
-
 		int best_val = 1;
-		vector<GameState> v = get_moves(s);
+		// vector<GameState> v = get_moves(s);
+		vector<GameState> v = get_ordered_moves(s, &height_heuristic);
 		for (GameState next : v) {
-			best_val = min(best_val, minimax(next, cache, depth + 1));
+			best_val = min(best_val, minimax(next, cache));
 			if (best_val == -1) {
 				break;
 			}
@@ -407,17 +440,71 @@ int minimax(GameState s, unordered_map<string,int>& cache, int depth) {
 	}
 }
 
+// int alphabeta(GameState s, unordered_map<string,int>& cache, int depth, int depth_limit,
+// 	int alpha, int beta) {
+// 	if (boost::optional<int> check = is_game_over(s)) {
+// 		return *check * 8;
+// 	}
+
+// 	string state_str = state_to_string(s);
+// 	if (s.turn == 0) {
+// 		// maximizing player
+// 		if (boost::optional<int> cached_value = get_cached_value(s, cache)) {
+// 			cout << "Cache Hit!" << endl;
+// 			return *cached_value;
+// 		}
+
+// 		// if no_moves left, lose by default
+// 		int best_val = -1;
+// 		// vector<GameState> v = get_moves(s)
+// 		vector<GameState> v = get_ordered_moves(s, &height_heuristic);
+// 		for (GameState next : v) {
+// 			best_val = max(best_val, alphabeta(next, cache, depth + 1, depth_limit));
+// 			if (best_val == 1) {
+// 				break;
+// 			}
+// 		}
+// 		cache[state_str] = best_val;
+// 		return best_val;
+// 	} else {
+// 		if (boost::optional<int> cached_value = get_cached_value(s, cache)) {
+// 			cout << "Cache Hit!" << endl;
+// 			return -1 * (*cached_value);
+// 		}
+
+// 		int best_val = 1;
+// 		// vector<GameState> v = get_moves(s);
+// 		vector<GameState> v = get_ordered_moves(s, &height_heuristic);
+// 		for (GameState next : v) {
+// 			best_val = min(best_val, alphabeta(next, cache, depth + 1, depth_limit));
+// 			if (best_val == -1) {
+// 				break;
+// 			}
+// 		}
+// 		cache[state_str] = -1*best_val;
+// 		return best_val;
+// 	}
+// }
+
 void test_minimax() {
 	GameState s;
 	s.dim = 3;
 	s.turn = 0;
-	s.p1 = {0, 0, 2, 2};
-	s.p2 = {0, 2, 1, 1};
+	s.p2 = {0, 0, 2, 2};
+	s.p1 = {0, 2, 1, 1};
 	s.board = "000000000";
 
 	unordered_map<string, int> cache;
 
-	int sol = minimax(s, cache, 0);
+	int sol = minimax(s, cache);
+
+	ofstream ofs("cache.txt");
+
+	{
+		boost::archive::text_oarchive oa(ofs);
+		oa << cache;
+	}
+
 	cout << sol << endl;
 }
 
