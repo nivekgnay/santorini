@@ -143,14 +143,7 @@ vector<GameState> get_moves(GameState s) {
 }
 
 int height_heuristic(GameState s) {
-	// p1's height - p2's height
-	// Position p;
-	// if (s.turn == 0) {
-	// 	p = s.p1;
-	// } else {
-	// 	p = s.p2;
-	// }
-
+	// Heuristic with respect to player 1
 	int index1 = s.p1.row1 * s.dim + s.p1.col1;
 	int index2 = s.p1.row2 * s.dim + s.p1.col2;
 
@@ -158,11 +151,6 @@ int height_heuristic(GameState s) {
 	int index4 = s.p2.row2 * s.dim + s.p2.col2;
 
 	return s.board[index1] + s.board[index2] - s.board[index3] - s.board[index4];
-
-	// int height1 = s.board[index1] - '0';
-	// int height2 = s.board[index2] - '0';
-
-	// return height1 + height2;
 }
 
 vector<GameState> get_ordered_moves(GameState s, function<int(GameState)> h) {
@@ -410,7 +398,7 @@ int minimax(GameState s, unordered_map<string,int>& cache) {
 
 		// if no_moves left, lose by default
 		int best_val = -1;
-		// vector<GameState> v = get_moves(s)
+		// vector<GameState> v = get_moves(s);
 		vector<GameState> v = get_ordered_moves(s, &height_heuristic);
 		for (GameState next : v) {
 			best_val = max(best_val, minimax(next, cache));
@@ -440,51 +428,52 @@ int minimax(GameState s, unordered_map<string,int>& cache) {
 	}
 }
 
-// int alphabeta(GameState s, unordered_map<string,int>& cache, int depth, int depth_limit,
-// 	int alpha, int beta) {
-// 	if (boost::optional<int> check = is_game_over(s)) {
-// 		return *check * 8;
-// 	}
+int alphabeta(GameState s, unordered_map<string,int>& cache, int depth,
+	int alpha, int beta) {
+	if (boost::optional<int> check = is_game_over(s)) {
+		return *check * 8;
+	} else if (depth == 0) {
+		return height_heuristic(s);
+	}
 
-// 	string state_str = state_to_string(s);
-// 	if (s.turn == 0) {
-// 		// maximizing player
-// 		if (boost::optional<int> cached_value = get_cached_value(s, cache)) {
-// 			cout << "Cache Hit!" << endl;
-// 			return *cached_value;
-// 		}
+	string state_str = state_to_string(s);
 
-// 		// if no_moves left, lose by default
-// 		int best_val = -1;
-// 		// vector<GameState> v = get_moves(s)
-// 		vector<GameState> v = get_ordered_moves(s, &height_heuristic);
-// 		for (GameState next : v) {
-// 			best_val = max(best_val, alphabeta(next, cache, depth + 1, depth_limit));
-// 			if (best_val == 1) {
-// 				break;
-// 			}
-// 		}
-// 		cache[state_str] = best_val;
-// 		return best_val;
-// 	} else {
-// 		if (boost::optional<int> cached_value = get_cached_value(s, cache)) {
-// 			cout << "Cache Hit!" << endl;
-// 			return -1 * (*cached_value);
-// 		}
+	if (s.turn == 0) {
+		if (boost::optional<int> cached_value = get_cached_value(s, cache)) {
+			cout << "Cache Hit!" << endl;
+			return *cached_value;
+		}
 
-// 		int best_val = 1;
-// 		// vector<GameState> v = get_moves(s);
-// 		vector<GameState> v = get_ordered_moves(s, &height_heuristic);
-// 		for (GameState next : v) {
-// 			best_val = min(best_val, alphabeta(next, cache, depth + 1, depth_limit));
-// 			if (best_val == -1) {
-// 				break;
-// 			}
-// 		}
-// 		cache[state_str] = -1*best_val;
-// 		return best_val;
-// 	}
-// }
+		int best_val = -8;
+		vector<GameState> v = get_ordered_moves(s, &height_heuristic);
+		for (GameState next : v) {
+			best_val = max(best_val, alphabeta(next, cache, depth - 1, alpha, beta));
+			alpha = max(alpha, best_val);
+			if (beta <= alpha || best_val == 8) {
+				break;
+			}
+		}
+		cache[state_str] = best_val;
+		return best_val;
+	} else {
+		if (boost::optional<int> cached_value = get_cached_value(s, cache)) {
+			cout << "Cache Hit!" << endl;
+			return -1 * (*cached_value);
+		}
+
+		int best_val = 8;
+		vector<GameState> v = get_ordered_moves(s, &height_heuristic);
+		for (GameState next : v) {
+			best_val = min(best_val, alphabeta(next, cache, depth - 1, alpha, beta));
+			beta = min(beta, best_val);
+			if (beta <= alpha || best_val == -8) {
+				break;
+			}
+		}
+		cache[state_str] = -1 * best_val;
+		return best_val;
+	}
+}
 
 void test_minimax() {
 	GameState s;
@@ -496,7 +485,15 @@ void test_minimax() {
 
 	unordered_map<string, int> cache;
 
-	int sol = minimax(s, cache);
+	// {
+	// 	std::ifstream ifs("cache.txt");
+	// 	if (ifs) {
+	// 		boost::archive::text_iarchive ia(ifs);
+	// 		ia >> cache;
+	// 	}
+	// }
+
+	int sol = alphabeta(s, cache, 15, -8, 8);
 
 	ofstream ofs("cache.txt");
 
